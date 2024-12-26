@@ -1,32 +1,34 @@
-import { readFileSync, writeFileSync } from "fs";
-import { v4 } from "uuid";
 import User from "../types/users";
-
-const getUsersAsObject = () => {
-  const file = JSON.parse(readFileSync("./mock-db.json").toString());
-  return file;
+import AWS from "aws-sdk";
+export const testIfUserExists = async (email: string) => {
+  const dynamoDB = new AWS.DynamoDB.DocumentClient();
+  const { Item } = await dynamoDB
+    .get({
+      TableName: "Users",
+      Key: { email },
+    })
+    .promise();
+  return Item as User;
 };
-
-export const isUserExist = (email: string): User => {
-  return getUsersAsObject().users.find((user: User) => user.email == email);
-};
-export const registerUser = (
+export const registerUser = async (
   email: string,
   hashedPassword: string,
   name: string
-): Partial<User> | null => {
+) => {
   try {
-    const uid = v4();
-    const file = getUsersAsObject();
-    const newUser = { name, email, password: hashedPassword, uid };
-    file.users.push(newUser);
-    writeFileSync("./mock-db.json", JSON.stringify(file));
-    const { password, ...rest } = newUser;
-    return rest;
+    const dynamoDB = new AWS.DynamoDB.DocumentClient();
+    const newUser = { name, email, password: hashedPassword };
+    const params = {
+      TableName: "Users",
+      Item: {
+        ...newUser,
+        createdAt: new Date().toString(),
+      },
+    };
+    await dynamoDB.put(params).promise();
   } catch (err) {
     if (err) {
       console.log(err);
     }
-    return null;
   }
 };
